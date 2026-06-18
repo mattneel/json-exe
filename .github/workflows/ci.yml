@@ -22,6 +22,11 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # Build first: the editor/playground typechecks resolve the workspace
+      # packages via their built dist (.d.ts), so they must exist beforehand.
+      - name: Build
+        run: pnpm -r build
+
       - name: Typecheck
         run: |
           pnpm typecheck
@@ -30,6 +35,3 @@ jobs:
 
       - name: Test
         run: pnpm test
-
-      - name: Build
-        run: pnpm -r build
