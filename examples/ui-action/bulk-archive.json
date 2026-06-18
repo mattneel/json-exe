@@ -1,0 +1,38 @@
+{
+  "$kind": "ui-action/v1",
+  "id": "bulk-archive",
+  "name": "Bulk Archive",
+  "description": "Archives the selected items (admins only).",
+
+  "visible": "return ctx.user.role === 'admin'",
+  "enabled": "return ctx.selection.length > 0",
+  "label": "return `Archive ${ctx.selection.length} items`",
+  "run": "return await ctx.actions.archive(ctx.selection.map(item => item.id))",
+
+  "$tests": [
+    {
+      "name": "visible to admins",
+      "slot": "visible",
+      "ctx": { "user": { "role": "admin" } },
+      "expect": true
+    },
+    {
+      "name": "hidden for non-admins",
+      "slot": "visible",
+      "ctx": { "user": { "role": "viewer" } },
+      "expect": false
+    },
+    {
+      "name": "disabled with empty selection",
+      "slot": "enabled",
+      "ctx": { "selection": [] },
+      "expect": false
+    },
+    {
+      "name": "label reflects selection count",
+      "slot": "label",
+      "ctx": { "selection": [1, 2, 3] },
+      "expect": "Archive 3 items"
+    }
+  ]
+}

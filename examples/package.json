@@ -1,0 +1,14 @@
+{
+  "name": "@json-exe/examples",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Runnable JSON.exe example extension types and extensions.",
+  "type": "module",
+  "scripts": {
+    "all": "tsx run.ts"
+  },
+  "dependencies": {
+    "@json-exe/runtime": "workspace:*",
+    "@json-exe/testing": "workspace:*"
+  }
+}

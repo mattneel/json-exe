@@ -1,0 +1,31 @@
+{
+  "$kind": "data-transform/v1",
+  "id": "normalize-user-row",
+  "name": "Normalize User Row",
+  "description": "Normalizes id, email, and active fields of a user row.",
+
+  "filter": "return !!ctx.row.email",
+  "map": "return { id: String(ctx.row.id), email: String(ctx.row.email).trim().toLowerCase(), active: Boolean(ctx.row.active) }",
+  "explain": "return 'Keeps rows with an email, then normalizes id, email, and active.'",
+
+  "$tests": [
+    {
+      "name": "keeps rows with an email",
+      "slot": "filter",
+      "ctx": { "row": { "email": "a@b.com" } },
+      "expect": true
+    },
+    {
+      "name": "drops rows without an email",
+      "slot": "filter",
+      "ctx": { "row": { "id": 1 } },
+      "expect": false
+    },
+    {
+      "name": "normalizes a row",
+      "slot": "map",
+      "ctx": { "row": { "id": 7, "email": "  A@B.COM ", "active": 1 } },
+      "expect": { "id": "7", "email": "a@b.com", "active": true }
+    }
+  ]
+}

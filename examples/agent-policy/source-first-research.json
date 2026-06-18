@@ -1,0 +1,55 @@
+{
+  "$kind": "agent-policy/v1",
+  "id": "source-first-research",
+  "name": "Source-First Research",
+  "description": "Gathers sources before answering.",
+
+  "$permissions": {
+    "tools": ["search"],
+    "network": false,
+    "memory": "read"
+  },
+
+  "state.init": "return { sources: [], attempts: 0 }",
+  "shouldUseTool": "return ctx.state.sources.length < 3 && ctx.budget.toolCallsRemaining > 0",
+  "toolCall": "return { tool: 'search', args: { query: ctx.input + ' official source' } }",
+  "afterTool": "return { ...ctx.state, attempts: ctx.state.attempts + 1, sources: ctx.state.sources.concat(ctx.result.items.slice(0, 5)) }",
+  "shouldAnswer": "return ctx.state.sources.length >= 3 || ctx.budget.toolCallsRemaining <= 0",
+  "answerInstructions": "return 'Answer using only ctx.state.sources. Cite factual claims. Say when evidence is insufficient.'",
+
+  "$tests": [
+    {
+      "name": "initializes state",
+      "slot": "state.init",
+      "ctx": {},
+      "expect": { "sources": [], "attempts": 0 }
+    },
+    {
+      "name": "uses a tool while under budget",
+      "slot": "shouldUseTool",
+      "ctx": { "state": { "sources": [] }, "budget": { "toolCallsRemaining": 3 } },
+      "expect": true
+    },
+    {
+      "name": "builds a search tool call",
+      "slot": "toolCall",
+      "ctx": { "input": "vaccines" },
+      "expect": { "tool": "search", "args": { "query": "vaccines official source" } }
+    },
+    {
+      "name": "merges results into state",
+      "slot": "afterTool",
+      "ctx": {
+        "state": { "sources": [], "attempts": 0 },
+        "result": { "items": [1, 2, 3, 4, 5, 6, 7] }
+      },
+      "expect": { "sources": [1, 2, 3, 4, 5], "attempts": 1 }
+    },
+    {
+      "name": "answers once enough sources gathered",
+      "slot": "shouldAnswer",
+      "ctx": { "state": { "sources": [1, 2, 3] }, "budget": { "toolCallsRemaining": 0 } },
+      "expect": true
+    }
+  ]
+}

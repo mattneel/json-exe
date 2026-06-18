@@ -1,0 +1,38 @@
+{
+  "$schema": "https://jsonexe.dev/schemas/extension.v1.json",
+  "$kind": "form-validator/v1",
+  "id": "required-email",
+  "name": "Required Email",
+  "description": "Validates that a field contains an email-like value.",
+
+  "validate": "return typeof ctx.value === 'string' && ctx.value.includes('@')",
+  "message": "return 'Please enter a valid email address.'",
+  "severity": "return 'error'",
+
+  "$tests": [
+    {
+      "name": "accepts an email",
+      "slot": "validate",
+      "ctx": { "value": "matt@example.com" },
+      "expect": true
+    },
+    {
+      "name": "rejects a non-email",
+      "slot": "validate",
+      "ctx": { "value": "nope" },
+      "expect": false
+    },
+    {
+      "name": "returns a message",
+      "slot": "message",
+      "ctx": {},
+      "expect": "Please enter a valid email address."
+    },
+    {
+      "name": "severity is error",
+      "slot": "severity",
+      "ctx": {},
+      "expect": "error"
+    }
+  ]
+}
