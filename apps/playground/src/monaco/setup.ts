@@ -2,8 +2,9 @@ import * as monaco from "monaco-editor";
 import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
 import jsonWorker from "monaco-editor/esm/vs/language/json/json.worker?worker";
 import tsWorker from "monaco-editor/esm/vs/language/typescript/ts.worker?worker";
-// Runtime type declarations (bundled .d.ts) loaded as text so Monaco's TS
-// service can resolve `@json-exe/runtime`. Requires `pnpm build` of the runtime.
+import { setupJsonExeMonaco, addRuntimeTypes } from "@json-exe/editor";
+// Runtime type declarations (bundled .d.ts) loaded as text so the spec editor
+// resolves `@json-exe/runtime`. Requires `pnpm build` of the runtime.
 import runtimeDts from "../../../../packages/runtime/dist/index.d.ts?raw";
 
 const globalScope = globalThis as typeof globalThis & {
@@ -24,33 +25,10 @@ globalScope.MonacoEnvironment = {
   },
 };
 
-// In monaco 0.55+ the TypeScript API lives at the top-level `monaco.typescript`
-// namespace (`monaco.languages.typescript` is a deprecated stub).
-const ts = monaco.typescript;
-
-ts.typescriptDefaults.setCompilerOptions({
-  target: ts.ScriptTarget.ES2020,
-  // CommonJS emit lets us execute the spec module with a fake `require`
-  // (see specEval.ts) — robust against multi-line imports, named exports, etc.
-  module: ts.ModuleKind.CommonJS,
-  moduleResolution: ts.ModuleResolutionKind.NodeJs,
-  allowNonTsExtensions: true,
-  strict: true,
-  noEmit: false,
-  esModuleInterop: true,
-  skipLibCheck: true,
-  lib: ["es2020", "dom"],
-});
-
-// Resolve `@json-exe/runtime` to the bundled declarations.
-ts.typescriptDefaults.addExtraLib(
-  runtimeDts,
-  "file:///node_modules/@json-exe/runtime/index.d.ts",
-);
-ts.typescriptDefaults.addExtraLib(
-  JSON.stringify({ name: "@json-exe/runtime", types: "index.d.ts" }),
-  "file:///node_modules/@json-exe/runtime/package.json",
-);
+// Configure Monaco's TS service for JSON.exe and load the runtime types for the
+// spec editor (both provided by @json-exe/editor).
+setupJsonExeMonaco(monaco);
+addRuntimeTypes(monaco, runtimeDts);
 
 monaco.editor.defineTheme("jsonexe-dark", {
   base: "vs-dark",

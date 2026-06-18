@@ -225,15 +225,15 @@ importers:
 
   apps/playground:
     dependencies:
+      '@json-exe/editor':
+        specifier: workspace:*
+        version: link:../../packages/editor
       '@json-exe/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
       '@json-exe/testing':
         specifier: workspace:*
         version: link:../../packages/testing
-      jsonc-parser:
-        specifier: ^3.3.1
-        version: 3.3.1
       monaco-editor:
         specifier: ^0.55.1
         version: 0.55.1
@@ -268,6 +268,22 @@ importers:
       '@json-exe/testing':
         specifier: workspace:*
         version: link:../testing
+
+  packages/editor:
+    dependencies:
+      '@json-exe/runtime':
+        specifier: workspace:*
+        version: link:../runtime
+      '@json-exe/testing':
+        specifier: workspace:*
+        version: link:../testing
+      jsonc-parser:
+        specifier: ^3.3.1
+        version: 3.3.1
+    devDependencies:
+      monaco-editor:
+        specifier: ^0.55.1
+        version: 0.55.1
 
   packages/runtime: {}
 

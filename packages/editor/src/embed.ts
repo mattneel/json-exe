@@ -3,7 +3,12 @@
  * Monaco and the DOM so they can be unit-tested in Node.
  */
 import { parseTree, type Node } from "jsonc-parser";
-import type { ExtensionTypeSpec, Schema, SchemaObject } from "@json-exe/runtime";
+import type {
+  ExtensionTypeSpec,
+  Schema,
+  SchemaObject,
+  SlotSpec,
+} from "@json-exe/runtime";
 
 export interface SlotStringRange {
   slot: string;
@@ -44,6 +49,54 @@ export function collectSlotStrings(
 
   visit(root, []);
   return out;
+}
+
+/**
+ * If `offset` falls within a declared slot's *property key*, return that slot's
+ * dotted name (used for slot-signature hovers on the key itself).
+ */
+export function slotKeyAt(
+  text: string,
+  slots: ReadonlySet<string>,
+  offset: number,
+): string | undefined {
+  const root = parseTree(text);
+  if (!root || root.type !== "object") return undefined;
+  let found: string | undefined;
+
+  const visit = (node: Node, path: string[]): void => {
+    if (found || node.type !== "object" || !node.children) return;
+    for (const prop of node.children) {
+      if (prop.type !== "property" || !prop.children) continue;
+      const keyNode = prop.children[0];
+      const valNode = prop.children[1];
+      if (!keyNode || typeof keyNode.value !== "string") continue;
+      const dotted = [...path, keyNode.value].join(".");
+      if (
+        offset >= keyNode.offset &&
+        offset <= keyNode.offset + keyNode.length &&
+        slots.has(dotted)
+      ) {
+        found = dotted;
+        return;
+      }
+      if (valNode?.type === "object") visit(valNode, [...path, keyNode.value]);
+    }
+  };
+
+  visit(root, []);
+  return found;
+}
+
+/** Render a slot's contract as Markdown for hovers (signature + flags + docs). */
+export function formatSlotSignature(name: string, slotSpec: SlotSpec): string {
+  const ret = schemaToTsType(slotSpec.returns);
+  const sig = slotSpec.async ? `(ctx) => Promise<${ret}>` : `(ctx) => ${ret}`;
+  const flags = [slotSpec.required ? "required" : "optional", slotSpec.async ? "async" : "sync"];
+  if (slotSpec.phase) flags.push(`phase: ${slotSpec.phase}`);
+  let md = "```typescript\nslot " + JSON.stringify(name) + ": " + sig + "\n```\n\n*" + flags.join(" · ") + "*";
+  if (slotSpec.description) md += `\n\n${slotSpec.description}`;
+  return md;
 }
 
 /** Find the [start, end) offsets of a top-level property's value node. */

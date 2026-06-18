@@ -1,6 +1,8 @@
 import * as runtime from "@json-exe/runtime";
 import type { ExtensionTypeSpec } from "@json-exe/runtime";
-import { monaco } from "../monaco/setup";
+import type * as M from "monaco-editor";
+
+type MonacoApi = typeof import("monaco-editor");
 
 export interface SpecEvalResult {
   spec?: ExtensionTypeSpec;
@@ -13,7 +15,7 @@ export interface SpecEvalResult {
 function specRequire(id: string): unknown {
   if (id === "@json-exe/runtime") return runtime;
   throw new Error(
-    `Cannot import "${id}" — only "@json-exe/runtime" is available in the playground.`,
+    `Cannot import "${id}" — only "@json-exe/runtime" is available in the spec sandbox.`,
   );
 }
 
@@ -33,7 +35,8 @@ function isSpec(value: unknown): value is ExtensionTypeSpec {
  * Robust to multi-line imports, named exports, comments, and `as const`.
  */
 export async function evalSpecModel(
-  model: monaco.editor.ITextModel,
+  monaco: MonacoApi,
+  model: M.editor.ITextModel,
 ): Promise<SpecEvalResult> {
   let js: string;
   try {

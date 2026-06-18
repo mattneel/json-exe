@@ -11,5 +11,8 @@
     "packages/*/src/**/*.ts",
     "packages/*/test/**/*.ts",
     "examples/**/*.ts"
-  ]
+  ],
+  // @json-exe/editor needs the DOM lib (Monaco/HTMLElement); it is typechecked
+  // via its own tsconfig, like the playground.
+  "exclude": ["packages/editor"]
 }

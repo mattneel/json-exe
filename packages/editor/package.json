@@ -1,0 +1,32 @@
+{
+  "name": "@json-exe/editor",
+  "version": "0.1.0",
+  "description": "Embeddable Monaco language features for JSON.exe: typed ctx completions, hover, signature help, diagnostics and return-type checking inside slot strings, plus a one-call extension editor component.",
+  "type": "module",
+  "license": "MIT",
+  "files": ["dist"],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "peerDependencies": {
+    "monaco-editor": ">=0.50.0"
+  },
+  "dependencies": {
+    "@json-exe/runtime": "workspace:*",
+    "@json-exe/testing": "workspace:*",
+    "jsonc-parser": "^3.3.1"
+  },
+  "devDependencies": {
+    "monaco-editor": "^0.55.1"
+  }
+}

@@ -6,12 +6,11 @@ import {
   type SlotResult,
 } from "@json-exe/runtime";
 import type { TestReport } from "@json-exe/testing";
+import { evalSpecModel, installJsonExeLanguage } from "@json-exe/editor";
 import { monaco } from "./monaco/setup";
 import { Editor } from "./components/Editor";
-import { evalSpecModel } from "./lib/specEval";
 import { parseJson, runSlot, runTests, toErrorObject } from "./lib/run";
 import { SAMPLES } from "./lib/samples";
-import { installJsonExeLanguage } from "./monaco/jsonexeLanguage";
 
 function model(uri: string, value: string, language: string) {
   const parsed = monaco.Uri.parse(uri);
@@ -74,10 +73,13 @@ export function App() {
   }
 
   // Language-server ergonomics for the extension JSON, driven by the live spec.
-  const language = installJsonExeLanguage(extModel, () => spec());
+  const language = installJsonExeLanguage(monaco, {
+    model: extModel,
+    getSpec: () => spec(),
+  });
 
   const evalSpec = async (attempt = 0): Promise<void> => {
-    const res = await evalSpecModel(specModel);
+    const res = await evalSpecModel(monaco, specModel);
     // Retry transient failures (TS worker still warming up on first load).
     if (res.transient && !res.spec && attempt < 12) {
       setTimeout(() => void evalSpec(attempt + 1), 150);

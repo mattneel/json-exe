@@ -8,9 +8,11 @@ import {
   findValueRange,
   rawToDecodedOffset,
   schemaToTsType,
+  slotKeyAt,
+  formatSlotSignature,
   specToJsonSchema,
   synthesizeCtxDecls,
-} from "../src/lib/embed";
+} from "../src/embed";
 
 describe("buildEscapeMap", () => {
   it("decodes escapes and maps offsets both ways", () => {
@@ -175,6 +177,44 @@ describe("schemaToTsType", () => {
     expect(schemaToTsType({ type: ["string", "number"] })).toBe("string | number");
     expect(schemaToTsType({ type: "array", items: "string" })).toBe("Array<string>");
     expect(schemaToTsType({ type: "string", nullable: true })).toBe("string | null");
+  });
+});
+
+describe("slotKeyAt", () => {
+  const slots = new Set(["validate", "state.init"]);
+  const text = `{
+  "$kind": "k",
+  "validate": "return true",
+  "state": { "init": "return {}" }
+}`;
+  it("returns the slot name when the offset is on a slot key", () => {
+    const offset = text.indexOf('"validate"') + 2;
+    expect(slotKeyAt(text, slots, offset)).toBe("validate");
+  });
+  it("returns the dotted name for a nested slot key", () => {
+    const offset = text.indexOf('"init"') + 2;
+    expect(slotKeyAt(text, slots, offset)).toBe("state.init");
+  });
+  it("returns undefined for non-slot keys / values", () => {
+    expect(slotKeyAt(text, slots, text.indexOf('"$kind"') + 2)).toBeUndefined();
+    expect(slotKeyAt(text, slots, text.indexOf("return true") + 1)).toBeUndefined();
+  });
+});
+
+describe("formatSlotSignature", () => {
+  it("renders signature, flags, and docs", () => {
+    const md = formatSlotSignature("validate", {
+      required: true,
+      returns: { type: "boolean" },
+      description: "Return true if valid.",
+    });
+    expect(md).toContain('slot "validate": (ctx) => boolean');
+    expect(md).toContain("required");
+    expect(md).toContain("Return true if valid.");
+  });
+  it("shows Promise for async slots", () => {
+    const md = formatSlotSignature("run", { async: true, returns: { type: "object" } });
+    expect(md).toContain("(ctx) => Promise<Record<string, unknown>>");
   });
 });
 

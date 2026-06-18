@@ -25,6 +25,7 @@ jobs:
       - name: Typecheck
         run: |
           pnpm typecheck
+          pnpm --filter @json-exe/editor typecheck
           pnpm --filter @json-exe/playground typecheck
 
       - name: Test
