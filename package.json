@@ -1,14 +1,29 @@
 {
   "name": "json-exe",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "version": "0.1.0",
+  "private": true,
+  "description": "JSON.exe — a universal executable-object substrate: JSON extensions whose named fields are JavaScript slots run against a documented host context.",
+  "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "pnpm -r build",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "examples": "pnpm --filter @json-exe/examples run all",
+    "clean": "pnpm -r exec rm -rf dist",
+    "check": "pnpm typecheck && pnpm test"
   },
-  "keywords": [],
+  "keywords": [
+    "json",
+    "plugins",
+    "extensions",
+    "scripting",
+    "agents",
+    "sandbox",
+    "executable-json"
+  ],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "devEngines": {
     "packageManager": {
       "name": "pnpm",
@@ -16,5 +31,11 @@
       "onFail": "download"
     }
   },
-  "type": "module"
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsup": "^8.3.0",
+    "tsx": "^4.19.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.0.0"
+  }
 }

@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "paths": {
+      "@json-exe/runtime": ["./packages/runtime/src/index.ts"],
+      "@json-exe/testing": ["./packages/testing/src/index.ts"]
+    }
+  },
+  "include": [
+    "packages/*/src/**/*.ts",
+    "packages/*/test/**/*.ts",
+    "examples/**/*.ts"
+  ]
+}
