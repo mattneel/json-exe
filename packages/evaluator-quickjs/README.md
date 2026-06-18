@@ -38,15 +38,31 @@ await ext.run("toolCall", {
 });
 ```
 
-## Options
+## Configuring evaluation
 
-| Option              | Default                                   | Notes |
-| ------------------- | ----------------------------------------- | ----- |
-| `module`            | loaded from `variant`                     | Reuse a pre-created `QuickJSWASMModule`. |
-| `variant`           | quickjs-ng wasmfile release **sync**      | Any quickjs-emscripten variant. |
-| `memoryLimitBytes`  | `16 * 1024 * 1024`                        | Per-run memory cap. |
-| `maxStackSizeBytes` | `512 * 1024`                             | Per-run stack cap. |
-| `deadlineMs`        | `1000`                                    | Per-run CPU deadline (interrupts loops). |
+Everything is configurable, with sensible defaults (exported as
+`DEFAULT_QUICKJS_LIMITS`):
+
+| Option              | Default                              | Notes |
+| ------------------- | ------------------------------------ | ----- |
+| `module`            | loaded from `variant`                | Reuse a pre-created `QuickJSWASMModule`. |
+| `variant`           | quickjs-ng wasmfile release **sync** | Any quickjs-emscripten variant. |
+| `memoryLimitBytes`  | `16 * 1024 * 1024`                   | Per-run memory cap. `-1` disables. |
+| `maxStackSizeBytes` | `512 * 1024`                         | Per-run stack cap. `-1` disables. |
+| `deadlineMs`        | `1000`                               | Per-run CPU deadline (interrupts loops → `TimeoutError`). `0`/`Infinity` disables. |
+| `interruptHandler`  | —                                    | Extra interrupt predicate (also reported as `TimeoutError`). |
+| `intrinsics`        | QuickJS defaults                     | Which built-ins to enable, e.g. `{ ...DefaultIntrinsics, Date: false }`. |
+| `maxJobsPerTick`    | all                                  | Max promise jobs drained per pump. |
+| `runtimeOptions`    | —                                    | Advanced passthrough to `newRuntime`. |
+| `contextOptions`    | —                                    | Advanced passthrough to `newContext`. |
+
+```ts
+const evaluator = await createQuickJSEvaluator({
+  memoryLimitBytes: 64 * 1024 * 1024,
+  deadlineMs: 250,
+  intrinsics: { ...DefaultIntrinsics, Proxy: false },
+});
+```
 
 A fresh runtime + context is created per run for isolation; the WASM module is
 loaded once and reused.

@@ -1,6 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { DefaultIntrinsics } from "quickjs-emscripten-core";
 import { compileExtension, defineExtensionType } from "@json-exe/runtime";
-import { createQuickJSEvaluator, type QuickJSEvaluator } from "../src/index";
+import {
+  createQuickJSEvaluator,
+  DEFAULT_QUICKJS_LIMITS,
+  type QuickJSEvaluator,
+} from "../src/index";
 
 let evaluator: QuickJSEvaluator;
 
@@ -117,6 +122,28 @@ describe("QuickJS evaluator", () => {
     const res = await ext.exec("spin");
     expect(res.ok).toBe(false);
     expect(res.error?.kind).toBe("TimeoutError");
+  });
+
+  it("exposes sensible default limits", () => {
+    expect(DEFAULT_QUICKJS_LIMITS.deadlineMs).toBe(1000);
+    expect(DEFAULT_QUICKJS_LIMITS.memoryLimitBytes).toBeGreaterThan(0);
+  });
+
+  it("honors configurable intrinsics (disable Date)", async () => {
+    const noDate = await createQuickJSEvaluator({
+      module: evaluator.module,
+      intrinsics: { ...DefaultIntrinsics, Date: false },
+    });
+    const spec = defineExtensionType({
+      kind: "intr/v1",
+      slots: { probe: { returns: { type: "string" } } },
+    });
+    const ext = await compileExtension(
+      spec,
+      { $kind: "intr/v1", probe: "return typeof Date" },
+      { evaluator: noDate },
+    );
+    expect(await ext.run("probe")).toBe("undefined");
   });
 
   it("still validates return values through the sandbox", async () => {

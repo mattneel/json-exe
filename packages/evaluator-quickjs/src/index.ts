@@ -13,11 +13,15 @@
  */
 import {
   newQuickJSWASMModuleFromVariant,
+  type ContextOptions,
+  type InterruptHandler,
+  type Intrinsics,
   type QuickJSContext,
   type QuickJSDeferredPromise,
   type QuickJSHandle,
   type QuickJSRuntime,
   type QuickJSWASMModule,
+  type RuntimeOptions,
   type SuccessOrFail,
 } from "quickjs-emscripten-core";
 import releaseSyncVariant from "@jitl/quickjs-ng-wasmfile-release-sync";
@@ -28,17 +32,55 @@ import {
   type Evaluator,
 } from "@json-exe/runtime";
 
+/** Tunable QuickJS evaluation limits/config. All fields are optional. */
 export interface QuickJSEvaluatorOptions {
   /** A pre-created QuickJS module. If omitted, one is loaded from `variant`. */
   module?: QuickJSWASMModule;
   /** A quickjs-emscripten variant to load (default: quickjs-ng wasmfile release sync). */
   variant?: unknown;
-  /** Memory limit per run, in bytes (default 16 MiB). */
+  /** Memory limit per run, in bytes. Default 16 MiB. Use `-1` to disable. */
   memoryLimitBytes?: number;
-  /** Max stack size per run, in bytes (default 512 KiB). */
+  /** Max stack size per run, in bytes. Default 512 KiB. Use `-1` to disable. */
   maxStackSizeBytes?: number;
-  /** CPU deadline per run, in ms — interrupts infinite loops (default 1000). */
+  /**
+   * CPU deadline per run, in ms — interrupts infinite loops (surfaced as a
+   * `TimeoutError`). Default 1000. Set `0` or `Infinity` to disable.
+   */
   deadlineMs?: number;
+  /**
+   * Custom interrupt handler (in addition to `deadlineMs`). Return `true` to
+   * abort the running code; an abort is reported as a `TimeoutError`.
+   */
+  interruptHandler?: InterruptHandler;
+  /**
+   * Which language intrinsics/built-ins to enable in the VM (e.g. disable
+   * `Date`, `Proxy`, `Eval`). Defaults to QuickJS's full default set.
+   */
+  intrinsics?: Intrinsics;
+  /** Max QuickJS jobs to drain per microtask pump (default: all). */
+  maxJobsPerTick?: number;
+  /** Advanced: extra runtime options merged into `newRuntime`. */
+  runtimeOptions?: RuntimeOptions;
+  /** Advanced: extra context options merged into `newContext`. */
+  contextOptions?: ContextOptions;
+}
+
+/** The default limits applied when options are omitted. */
+export const DEFAULT_QUICKJS_LIMITS = {
+  memoryLimitBytes: 16 * 1024 * 1024,
+  maxStackSizeBytes: 512 * 1024,
+  deadlineMs: 1000,
+} as const;
+
+interface ResolvedConfig {
+  memoryLimitBytes: number;
+  maxStackSizeBytes: number;
+  deadlineMs: number;
+  interruptHandler?: InterruptHandler;
+  intrinsics?: Intrinsics;
+  maxJobsPerTick?: number;
+  runtimeOptions?: RuntimeOptions;
+  contextOptions?: ContextOptions;
 }
 
 export interface QuickJSEvaluator extends Evaluator {
@@ -66,12 +108,15 @@ function isThenable(value: unknown): value is PromiseLike<unknown> {
  * caller (dispose it after use / setProp). Host functions are wrapped so the
  * guest can call them (sync return values and Promises are both handled).
  */
-function toVm(
-  vm: QuickJSContext,
-  runtime: QuickJSRuntime,
-  value: unknown,
-  deferreds: QuickJSDeferredPromise[],
-): QuickJSHandle {
+interface Marshaller {
+  vm: QuickJSContext;
+  runtime: QuickJSRuntime;
+  deferreds: QuickJSDeferredPromise[];
+  maxJobs: number | undefined;
+}
+
+function toVm(m: Marshaller, value: unknown): QuickJSHandle {
+  const { vm } = m;
   if (value === undefined) return vm.undefined;
   if (value === null) return vm.null;
 
@@ -85,12 +130,12 @@ function toVm(
     case "string":
       return vm.newString(value);
     case "function":
-      return marshalFunction(vm, runtime, value as (...a: unknown[]) => unknown, deferreds);
+      return marshalFunction(m, value as (...a: unknown[]) => unknown);
     case "object": {
       if (Array.isArray(value)) {
         const arr = vm.newArray();
         for (let i = 0; i < value.length; i++) {
-          const child = toVm(vm, runtime, value[i], deferreds);
+          const child = toVm(m, value[i]);
           vm.setProp(arr, i, child);
           child.dispose();
         }
@@ -98,7 +143,7 @@ function toVm(
       }
       const obj = vm.newObject();
       for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
-        const child = toVm(vm, runtime, val, deferreds);
+        const child = toVm(m, val);
         vm.setProp(obj, key, child);
         child.dispose();
       }
@@ -109,12 +154,8 @@ function toVm(
   }
 }
 
-function marshalFunction(
-  vm: QuickJSContext,
-  runtime: QuickJSRuntime,
-  fn: (...args: unknown[]) => unknown,
-  deferreds: QuickJSDeferredPromise[],
-): QuickJSHandle {
+function marshalFunction(m: Marshaller, fn: (...args: unknown[]) => unknown): QuickJSHandle {
+  const { vm, runtime } = m;
   return vm.newFunction("", (...argHandles) => {
     const args = argHandles.map((h) => vm.dump(h));
     let result: unknown;
@@ -126,27 +167,27 @@ function marshalFunction(
 
     if (isThenable(result)) {
       const deferred = vm.newPromise();
-      deferreds.push(deferred);
+      m.deferreds.push(deferred);
       Promise.resolve(result).then(
         (resolved) => {
           // resolve() invokes the VM resolver but does NOT dispose the handle
           // we pass, so we own it and must dispose it.
-          const handle = toVm(vm, runtime, resolved, deferreds);
+          const handle = toVm(m, resolved);
           deferred.resolve(handle);
           handle.dispose();
-          runtime.executePendingJobs();
+          runtime.executePendingJobs(m.maxJobs);
         },
         (rejected) => {
           const handle = vm.newString(errMsg(rejected));
           deferred.reject(handle);
           handle.dispose();
-          runtime.executePendingJobs();
+          runtime.executePendingJobs(m.maxJobs);
         },
       );
       return deferred.handle;
     }
 
-    return toVm(vm, runtime, result, deferreds);
+    return toVm(m, result);
   });
 }
 
@@ -155,44 +196,62 @@ interface RunParams {
   wrapped: string;
   async: boolean;
   ctx: unknown;
-  memoryLimitBytes: number;
-  maxStackSizeBytes: number;
-  deadlineMs: number;
 }
 
-async function runOnce(module: QuickJSWASMModule, p: RunParams): Promise<unknown> {
-  const runtime = module.newRuntime();
-  runtime.setMemoryLimit(p.memoryLimitBytes);
-  runtime.setMaxStackSize(p.maxStackSizeBytes);
+async function runOnce(
+  module: QuickJSWASMModule,
+  config: ResolvedConfig,
+  p: RunParams,
+): Promise<unknown> {
+  const runtime = module.newRuntime(config.runtimeOptions ?? {});
+  runtime.setMemoryLimit(config.memoryLimitBytes);
+  runtime.setMaxStackSize(config.maxStackSizeBytes);
 
-  const deadline = Date.now() + p.deadlineMs;
+  const useDeadline =
+    Number.isFinite(config.deadlineMs) && config.deadlineMs > 0;
+  const deadline = useDeadline ? Date.now() + config.deadlineMs : 0;
   let interrupted = false;
-  runtime.setInterruptHandler(() => {
-    if (Date.now() > deadline) {
-      interrupted = true;
-      return true;
-    }
-    return false;
-  });
+  if (useDeadline || config.interruptHandler) {
+    runtime.setInterruptHandler((rt) => {
+      if (useDeadline && Date.now() > deadline) {
+        interrupted = true;
+        return true;
+      }
+      if (config.interruptHandler?.(rt)) {
+        interrupted = true;
+        return true;
+      }
+      return false;
+    });
+  }
 
-  const vm = runtime.newContext();
+  const contextOptions: ContextOptions = { ...config.contextOptions };
+  if (config.intrinsics) contextOptions.intrinsics = config.intrinsics;
+  const vm = runtime.newContext(contextOptions);
   const deferreds: QuickJSDeferredPromise[] = [];
 
   // Unwrap a VM result to its value handle, or throw. unwrapResult disposes the
-  // error handle for us; we surface a TimeoutError when the CPU deadline fired.
+  // error handle for us; we surface a TimeoutError when an interrupt fired.
   const unwrap = (
     result: SuccessOrFail<QuickJSHandle, QuickJSHandle>,
   ): QuickJSHandle => {
     try {
       return vm.unwrapResult(result);
     } catch (err) {
-      if (interrupted) throw new TimeoutError(p.slot, p.deadlineMs);
+      if (interrupted) throw new TimeoutError(p.slot, config.deadlineMs);
       throw new Error(err instanceof Error ? err.message : String(err));
     }
   };
 
+  const marshaller: Marshaller = {
+    vm,
+    runtime,
+    deferreds,
+    maxJobs: config.maxJobsPerTick,
+  };
+
   try {
-    const ctxHandle = toVm(vm, runtime, p.ctx, deferreds);
+    const ctxHandle = toVm(marshaller, p.ctx);
     const globalHandle = vm.global;
     vm.setProp(globalHandle, "ctx", ctxHandle);
     ctxHandle.dispose();
@@ -203,9 +262,9 @@ async function runOnce(module: QuickJSWASMModule, p: RunParams): Promise<unknown
     if (p.async) {
       const hostPromise = vm.resolvePromise(resultHandle);
       resultHandle.dispose();
-      runtime.executePendingJobs();
+      runtime.executePendingJobs(config.maxJobsPerTick);
       const settled = await hostPromise;
-      runtime.executePendingJobs();
+      runtime.executePendingJobs(config.maxJobsPerTick);
       const valueHandle = unwrap(settled);
       const out = vm.dump(valueHandle);
       valueHandle.dispose();
@@ -247,9 +306,16 @@ export async function createQuickJSEvaluator(
         typeof newQuickJSWASMModuleFromVariant
       >[0],
     ));
-  const memoryLimitBytes = options.memoryLimitBytes ?? 16 * 1024 * 1024;
-  const maxStackSizeBytes = options.maxStackSizeBytes ?? 512 * 1024;
-  const deadlineMs = options.deadlineMs ?? 1000;
+  const config: ResolvedConfig = {
+    memoryLimitBytes: options.memoryLimitBytes ?? DEFAULT_QUICKJS_LIMITS.memoryLimitBytes,
+    maxStackSizeBytes: options.maxStackSizeBytes ?? DEFAULT_QUICKJS_LIMITS.maxStackSizeBytes,
+    deadlineMs: options.deadlineMs ?? DEFAULT_QUICKJS_LIMITS.deadlineMs,
+    interruptHandler: options.interruptHandler,
+    intrinsics: options.intrinsics,
+    maxJobsPerTick: options.maxJobsPerTick,
+    runtimeOptions: options.runtimeOptions,
+    contextOptions: options.contextOptions,
+  };
 
   return {
     name: "quickjs",
@@ -258,16 +324,7 @@ export async function createQuickJSEvaluator(
       const wrapped = async
         ? `(async () => {\n${source}\n})()`
         : `(() => {\n${source}\n})()`;
-      return (ctx: unknown) =>
-        runOnce(module, {
-          slot,
-          wrapped,
-          async,
-          ctx,
-          memoryLimitBytes,
-          maxStackSizeBytes,
-          deadlineMs,
-        });
+      return (ctx: unknown) => runOnce(module, config, { slot, wrapped, async, ctx });
     },
     dispose() {
       // The WASM module is reusable and holds no per-run resources (runtimes
