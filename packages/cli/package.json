@@ -1,0 +1,19 @@
+{
+  "name": "jsonexe",
+  "version": "0.1.0",
+  "description": "Command-line interface for JSON.exe: validate, run, test, check, and explain extensions.",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "jsonexe": "./dist/index.js"
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@json-exe/runtime": "workspace:*",
+    "@json-exe/testing": "workspace:*"
+  }
+}
