@@ -1,6 +1,6 @@
 {
   "name": "@json-exe/playground",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "private": true,
   "description": "Monaco-based playground for authoring JSON.exe extension types and extensions with language-server ergonomics.",
   "type": "module",

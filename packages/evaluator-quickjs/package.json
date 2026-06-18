@@ -1,10 +1,12 @@
 {
   "name": "@json-exe/evaluator-quickjs",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "description": "Sandboxed JSON.exe evaluator backed by QuickJS-ng compiled to WebAssembly. Runs slot code with no host globals, memory limits, and CPU timeouts.",
   "type": "module",
   "license": "MIT",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -15,6 +17,7 @@
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
+    "prepack": "tsup",
     "build": "tsup",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
@@ -22,5 +25,20 @@
     "@json-exe/runtime": "workspace:*",
     "quickjs-emscripten-core": "^0.32.0",
     "@jitl/quickjs-ng-wasmfile-release-sync": "^0.32.0"
+  },
+  "author": "Matt Neel",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mattneel/json-exe.git",
+    "directory": "packages/evaluator-quickjs"
+  },
+  "homepage": "https://github.com/mattneel/json-exe#readme",
+  "bugs": "https://github.com/mattneel/json-exe/issues",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

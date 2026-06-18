@@ -1,6 +1,6 @@
 {
   "name": "json-exe",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "private": true,
   "description": "JSON.exe — a universal executable-object substrate: JSON extensions whose named fields are JavaScript slots run against a documented host context.",
   "type": "module",
@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "examples": "pnpm --filter @json-exe/examples run all",
     "clean": "pnpm -r exec rm -rf dist",
-    "check": "pnpm typecheck && pnpm test"
+    "check": "pnpm typecheck && pnpm test",
+    "release": "pnpm -r build && pnpm -r publish"
   },
   "keywords": [
     "json",

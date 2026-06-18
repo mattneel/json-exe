@@ -1,19 +1,34 @@
 {
   "name": "jsonexe",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "description": "Command-line interface for JSON.exe: validate, run, test, check, and explain extensions.",
   "type": "module",
   "license": "MIT",
   "bin": {
     "jsonexe": "./dist/index.js"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
+    "prepack": "tsup",
     "build": "tsup",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@json-exe/runtime": "workspace:*",
     "@json-exe/testing": "workspace:*"
+  },
+  "author": "Matt Neel",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mattneel/json-exe.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://github.com/mattneel/json-exe#readme",
+  "bugs": "https://github.com/mattneel/json-exe/issues",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
   }
 }

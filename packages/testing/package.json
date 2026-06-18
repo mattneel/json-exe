@@ -1,10 +1,12 @@
 {
   "name": "@json-exe/testing",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "description": "Run the $tests embedded in a JSON.exe extension and report pass/fail.",
   "type": "module",
   "license": "MIT",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -15,10 +17,26 @@
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
+    "prepack": "tsup",
     "build": "tsup",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@json-exe/runtime": "workspace:*"
+  },
+  "author": "Matt Neel",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mattneel/json-exe.git",
+    "directory": "packages/testing"
+  },
+  "homepage": "https://github.com/mattneel/json-exe#readme",
+  "bugs": "https://github.com/mattneel/json-exe/issues",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
