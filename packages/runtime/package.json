@@ -1,0 +1,21 @@
+{
+  "name": "@json-exe/runtime",
+  "version": "0.1.0",
+  "description": "Core runtime for JSON.exe: define extension types, compile JSON extensions into JS slots, run them against ctx with return validation and tracing.",
+  "type": "module",
+  "license": "MIT",
+  "files": ["dist"],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  }
+}
