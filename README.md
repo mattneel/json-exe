@@ -2,6 +2,8 @@
 
 > JSON that runs. Executable JSON for plugins, agents, and extensions.
 
+**▶ [Try the playground](https://mattneel.github.io/json-exe/)** — author specs and extensions with live typed-`ctx` IntelliSense, run/test/trace, and a sandboxed QuickJS executor, all in the browser.
+
 **JSON.exe** is a universal plugin / extension / scripting layer where extensions
 are plain JSON objects, and selected named fields are executable JavaScript
 "slots" evaluated against a documented host context.
@@ -245,6 +247,8 @@ jsonexe run required-email.json validate --ctx ctx.json --spec form-validator.sp
 ---
 
 ## Playground
+
+**Live: [mattneel.github.io/json-exe](https://mattneel.github.io/json-exe/)** (deployed from `master` via GitHub Actions).
 
 A browser playground (`apps/playground`, SolidJS + Vite + Monaco) lets you author
 a spec (TypeScript, with IntelliSense on `@json-exe/runtime`) and an extension

@@ -3,6 +3,8 @@
 A Monaco-based playground for authoring JSON.exe **extension types** and
 **extensions** with language-server ergonomics, and running them in the browser.
 
+**Live: [mattneel.github.io/json-exe](https://mattneel.github.io/json-exe/)**
+
 ## What it does
 
 - **Spec editor** (TypeScript) — author `defineExtensionType({ ... })` with full
