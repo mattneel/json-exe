@@ -91,6 +91,24 @@ const ok = await ext.run("validate", { value: "matt@example.com" });
 
 That's the entire model. Everything else is adapters, docs, examples, and safety.
 
+### More than `eval`
+
+A plain eval system is `string → Function → hope`. JSON.exe is spec-driven:
+
+```txt
+spec → typed ctx → slot contracts → JSON-aware editing → validation → tests → trace → repair
+```
+
+A single host spec is simultaneously the runtime ABI, the validation schema, the
+editor schema, a mini language-server input, the test-harness definition, and the
+LLM generation contract.
+
+> JSON.exe is executable JSON with spec-driven tooling. Define the host context
+> and slot contracts once, and the runtime automatically gets validation,
+> execution, testing, tracing, autocomplete, hovers, and repair boundaries.
+> **JSON.exe turns every extension type into its own tiny typed programming
+> environment.**
+
 ---
 
 ## Core API (`@json-exe/runtime`)
@@ -229,8 +247,10 @@ jsonexe run required-email.json validate --ctx ctx.json --spec form-validator.sp
 A browser playground (`apps/playground`, SolidJS + Vite + Monaco) lets you author
 a spec (TypeScript, with IntelliSense on `@json-exe/runtime`) and an extension
 (JSON, with a **TypeScript service embedded inside the slot strings** — `ctx.*`
-completions/hover/type-errors driven by the live spec), then run/test/trace it
-in-browser using the real runtime.
+completions/hover/type-errors **and return-type checking** driven by the live
+spec, so a `boolean` slot that returns a string is squiggled and an `enum` slot
+autocompletes its allowed values), then run/test/trace it in-browser using the
+real runtime.
 
 ```bash
 pnpm --filter @json-exe/playground dev

@@ -92,9 +92,9 @@ export default defineExtensionType({
   kind: "agent-policy/v1",
   context: {
     input: "string",
-    state: "Record<string, unknown>",
+    state: "{ sources: unknown[]; attempts: number }",
     budget: "{ toolCallsRemaining: number }",
-    result: "unknown",
+    result: "{ items: unknown[] }",
   },
   slots: {
     "state.init": { phase: "init", returns: { type: "object" } },

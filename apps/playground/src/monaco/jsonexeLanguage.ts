@@ -11,6 +11,7 @@ import {
   decodedToRawOffset,
   findValueRange,
   rawToDecodedOffset,
+  schemaToTsType,
   specToJsonSchema,
   synthesizeCtxDecls,
   type EscapeMap,
@@ -123,7 +124,12 @@ export function installJsonExeLanguage(
     const map = buildEscapeMap(raw);
     // CR -> LF keeps the hidden-model offsets aligned with our map (Monaco
     // normalizes EOL); \r and \n are equivalent for TS analysis.
-    const mod = buildSlotModule(synthesizeCtxDecls(spec), map.decoded.replace(/\r/g, "\n"));
+    const returnType = schemaToTsType(spec.slots[hit.slot]?.returns);
+    const mod = buildSlotModule(
+      synthesizeCtxDecls(spec),
+      map.decoded.replace(/\r/g, "\n"),
+      returnType,
+    );
     const model = ensureHidden(hit.slot);
     if (model.getValue() !== mod.content) model.setValue(mod.content);
 
@@ -281,7 +287,8 @@ export function installJsonExeLanguage(
     for (const r of ranges) {
       const raw = text.slice(r.start, r.end);
       const map = buildEscapeMap(raw);
-      const mod = buildSlotModule(decls, map.decoded.replace(/\r/g, "\n"));
+      const returnType = schemaToTsType(spec.slots[r.slot]?.returns);
+      const mod = buildSlotModule(decls, map.decoded.replace(/\r/g, "\n"), returnType);
       const model = ensureHidden(r.slot);
       if (model.getValue() !== mod.content) model.setValue(mod.content);
       const client = await tsWorker(model.uri);

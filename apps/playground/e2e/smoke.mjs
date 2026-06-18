@@ -106,7 +106,19 @@ await page
 const out2 = (await page.locator(".output").textContent()) || "";
 assert(/[1-9]\d* passed/.test(out2), `tests pass: "${out2.trim().slice(0, 40)}"`);
 
-// 5. The embedded-TS bridge flags a slot-level TYPE error (not a structural one).
+// 5a. The default (well-typed) sample has NO embedded-TS error markers.
+const clean = await page.evaluate(async () => {
+  const m = globalThis.jsonexeMonaco;
+  const ext = m.editor.getModels().find((x) => x.uri.toString().includes("extension.json"));
+  await new Promise((r) => setTimeout(r, 1500));
+  return m.editor
+    .getModelMarkers({ resource: ext.uri })
+    .filter((k) => k.source === "ts(ctx)" && k.severity === 8)
+    .map((k) => k.message);
+});
+assert(clean.length === 0, `clean sample has no ts(ctx) errors: ${JSON.stringify(clean).slice(0, 200)}`);
+
+// 5b. Return-type awareness: a boolean slot returning a string is flagged.
 const bridge = await page.evaluate(async () => {
   const m = globalThis.jsonexeMonaco;
   if (!m) return { error: "no monaco hook" };
@@ -114,27 +126,25 @@ const bridge = await page.evaluate(async () => {
   if (!ext) return { error: "no extension model" };
   ext.setValue(
     JSON.stringify(
-      {
-        $kind: "form-validator/v1",
-        id: "x",
-        // Returns boolean (structurally valid) but contains a TS type error:
-        validate: "const n: number = 'nope'; return true;",
-      },
+      { $kind: "form-validator/v1", id: "x", validate: "return 'yes'" },
       null,
       2,
     ),
   );
   const deadline = Date.now() + 9000;
   while (Date.now() < deadline) {
-    const markers = m.editor.getModelMarkers({ resource: ext.uri });
-    if (markers.some((mk) => mk.source === "ts(ctx)")) {
-      return { ok: true, markers: markers.map((x) => ({ source: x.source, message: x.message })) };
-    }
+    const markers = m.editor
+      .getModelMarkers({ resource: ext.uri })
+      .filter((mk) => mk.source === "ts(ctx)");
+    if (markers.length) return { ok: true, markers: markers.map((x) => x.message) };
     await new Promise((r) => setTimeout(r, 250));
   }
-  return { ok: false, markers: m.editor.getModelMarkers({ resource: ext.uri }).map((x) => ({ source: x.source, message: x.message })) };
+  return { ok: false, markers: [] };
 });
-assert(bridge.ok === true, `embedded TS bridge flags slot type error: ${JSON.stringify(bridge).slice(0, 220)}`);
+assert(
+  bridge.ok === true && /boolean/.test(JSON.stringify(bridge.markers)),
+  `return-type awareness flags string-for-boolean: ${JSON.stringify(bridge).slice(0, 220)}`,
+);
 
 await browser.close();
 

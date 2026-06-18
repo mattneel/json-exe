@@ -7,6 +7,7 @@ import {
   decodedToRawOffset,
   findValueRange,
   rawToDecodedOffset,
+  schemaToTsType,
   specToJsonSchema,
   synthesizeCtxDecls,
 } from "../src/lib/embed";
@@ -153,6 +154,30 @@ describe("findValueRange", () => {
   });
 });
 
+describe("schemaToTsType", () => {
+  it("maps primitives", () => {
+    expect(schemaToTsType("boolean")).toBe("boolean");
+    expect(schemaToTsType({ type: "string" })).toBe("string");
+    expect(schemaToTsType({ type: "integer" })).toBe("number");
+    expect(schemaToTsType({ type: "object" })).toBe("Record<string, unknown>");
+    expect(schemaToTsType(undefined)).toBe("unknown");
+    expect(schemaToTsType("unknown")).toBe("unknown");
+  });
+
+  it("maps enums to string-literal unions", () => {
+    expect(schemaToTsType({ enum: ["info", "warning", "error"] })).toBe(
+      '"info" | "warning" | "error"',
+    );
+  });
+
+  it("maps const, unions, arrays, and nullable", () => {
+    expect(schemaToTsType({ const: 42 })).toBe("42");
+    expect(schemaToTsType({ type: ["string", "number"] })).toBe("string | number");
+    expect(schemaToTsType({ type: "array", items: "string" })).toBe("Array<string>");
+    expect(schemaToTsType({ type: "string", nullable: true })).toBe("string | null");
+  });
+});
+
 describe("buildSlotModule", () => {
   it("places the decoded source at bodyOffset", () => {
     const mod = buildSlotModule("declare const ctx: any;\n", "return ctx.value");
@@ -160,5 +185,10 @@ describe("buildSlotModule", () => {
       "return ctx.value",
     );
     expect(mod.content).toContain("async function __slot__");
+  });
+
+  it("annotates the wrapper return type from the schema", () => {
+    const mod = buildSlotModule("", "return true", "boolean");
+    expect(mod.content).toContain("Promise<boolean>");
   });
 });

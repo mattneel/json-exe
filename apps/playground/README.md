@@ -12,9 +12,11 @@ A Monaco-based playground for authoring JSON.exe **extension types** and
 - **Extension editor** (JSON) with an **embedded TypeScript service inside slot
   strings**: completions, hover, and type diagnostics for `ctx.*`, where the
   `ctx` type is synthesized from the live spec's `context`. Offsets are mapped
-  precisely through JSON string escaping. Plus structural validation markers
-  (kind mismatch, missing/invalid slots) from the real runtime, and key/`$kind`
-  completions from a spec-derived JSON schema.
+  precisely through JSON string escaping. Each slot is also checked against its
+  declared `returns` schema — a `boolean` slot that returns a string is
+  squiggled, and an `enum` slot autocompletes and rejects its allowed values.
+  Plus structural validation markers (kind mismatch, missing/invalid slots) from
+  the real runtime, and key/`$kind` completions from a spec-derived JSON schema.
 - **Run panel** — compile in-browser, run any slot against a `ctx` editor, run
   the embedded `$tests`, and view the structured result + trace. Powered by the
   real `@json-exe/runtime` and `@json-exe/testing` — it eats its own dogfood.

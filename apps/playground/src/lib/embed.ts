@@ -3,7 +3,7 @@
  * Monaco and the DOM so they can be unit-tested in Node.
  */
 import { parseTree, type Node } from "jsonc-parser";
-import type { ExtensionTypeSpec } from "@json-exe/runtime";
+import type { ExtensionTypeSpec, Schema, SchemaObject } from "@json-exe/runtime";
 
 export interface SlotStringRange {
   slot: string;
@@ -138,15 +138,59 @@ export function specToJsonSchema(spec: ExtensionTypeSpec): Record<string, unknow
   return { type: "object", properties, additionalProperties: true };
 }
 
+function tsForTypeName(name: string, s: SchemaObject): string {
+  switch (name) {
+    case "string": return "string";
+    case "number":
+    case "integer": return "number";
+    case "boolean": return "boolean";
+    case "null": return "null";
+    case "array": return s.items ? `Array<${schemaToTsType(s.items)}>` : "unknown[]";
+    case "object": return "Record<string, unknown>";
+    default: return "unknown"; // "any"/"unknown"/documentation-style names
+  }
+}
+
+/**
+ * Translate a slot `returns` schema into a TypeScript type, so the embedded
+ * service can check that a slot's body returns the declared type. Enums become
+ * string-literal unions (giving both rejection and value autocomplete).
+ */
+export function schemaToTsType(schema: Schema | undefined): string {
+  if (schema === undefined) return "unknown";
+  if (typeof schema === "string") return tsForTypeName(schema, {});
+  const s = schema;
+  let base: string;
+  if (s.const !== undefined) {
+    base = JSON.stringify(s.const);
+  } else if (s.enum) {
+    base = s.enum.length ? s.enum.map((v) => JSON.stringify(v)).join(" | ") : "never";
+  } else if (s.type !== undefined) {
+    const types = Array.isArray(s.type) ? s.type : [s.type];
+    base = types.map((t) => tsForTypeName(t, s)).join(" | ");
+  } else {
+    base = "unknown";
+  }
+  return s.nullable ? `${base} | null` : base;
+}
+
 export interface SlotModule {
   content: string;
   /** Offset in `content` where the (decoded) slot source begins. */
   bodyOffset: number;
 }
 
-/** Build the hidden TS module that wraps a slot's decoded source. */
-export function buildSlotModule(decls: string, decodedSource: string): SlotModule {
-  const prefix = `${decls}export {};\nasync function __slot__(): Promise<unknown> {\n`;
+/**
+ * Build the hidden TS module that wraps a slot's decoded source. The wrapper's
+ * return type comes from the slot's `returns` schema so the body is checked
+ * against the declared contract.
+ */
+export function buildSlotModule(
+  decls: string,
+  decodedSource: string,
+  returnType = "unknown",
+): SlotModule {
+  const prefix = `${decls}export {};\nasync function __slot__(): Promise<${returnType}> {\n`;
   return {
     content: `${prefix}${decodedSource}\n}\n`,
     bodyOffset: prefix.length,
