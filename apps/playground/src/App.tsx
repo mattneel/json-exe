@@ -37,7 +37,10 @@ type Output =
 
 export function App() {
   const sample0 = SAMPLES[0]!;
-  const specModel = model("inmemory://playground/spec.ts", sample0.spec, "typescript");
+  // The spec model uses the file:// scheme so Monaco's Node module resolution
+  // walks up to file:///node_modules/@json-exe/runtime (the extra-lib added in
+  // monaco/setup.ts) and resolves the import for IntelliSense.
+  const specModel = model("file:///spec.ts", sample0.spec, "typescript");
   const extModel = model("inmemory://playground/extension.json", sample0.extension, "json");
   const ctxModel = model("inmemory://playground/ctx.json", sample0.ctx, "json");
 

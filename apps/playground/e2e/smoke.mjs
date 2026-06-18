@@ -64,6 +64,24 @@ await page
 const problems = (await page.locator(".problems").first().textContent()) || "";
 assert(problems.includes("valid"), `extension validates: "${problems.trim().slice(0, 50)}"`);
 
+// 2b. The spec editor resolves @json-exe/runtime (no type errors / import 2307).
+const specCheck = await page.evaluate(async () => {
+  const m = globalThis.jsonexeMonaco;
+  if (!m) return { error: "no monaco hook" };
+  const spec = m.editor.getModels().find((x) => x.uri.toString().endsWith("spec.ts"));
+  if (!spec) return { error: "no spec model" };
+  await new Promise((r) => setTimeout(r, 3000)); // let TS diagnostics settle
+  const errors = m.editor
+    .getModelMarkers({ resource: spec.uri })
+    .filter((k) => k.severity === 8) // MarkerSeverity.Error
+    .map((k) => k.message);
+  return { errors };
+});
+assert(
+  Array.isArray(specCheck.errors) && specCheck.errors.length === 0,
+  `spec editor resolves the runtime import (no type errors): ${JSON.stringify(specCheck).slice(0, 200)}`,
+);
+
 // 3. Run a slot — runtime executes in the browser, result + trace shown.
 // Wait for the spec to evaluate (slot dropdown populated).
 await page.waitForFunction(
