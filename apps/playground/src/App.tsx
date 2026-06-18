@@ -51,11 +51,38 @@ export function App() {
   const [output, setOutput] = createSignal<Output>({ kind: "idle" });
   const [busy, setBusy] = createSignal(false);
 
+  // Draggable vertical divider between the two columns.
+  const [colFr, setColFr] = createSignal(0.5);
+  const [dragging, setDragging] = createSignal(false);
+  let gridEl: HTMLElement | undefined;
+
+  function onGutterDown(e: PointerEvent) {
+    e.preventDefault();
+    setDragging(true);
+    const move = (ev: PointerEvent) => {
+      if (!gridEl) return;
+      const r = gridEl.getBoundingClientRect();
+      setColFr(Math.min(0.85, Math.max(0.15, (ev.clientX - r.left) / r.width)));
+    };
+    const up = () => {
+      setDragging(false);
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  }
+
   // Language-server ergonomics for the extension JSON, driven by the live spec.
   const language = installJsonExeLanguage(extModel, () => spec());
 
-  const evalSpec = async () => {
+  const evalSpec = async (attempt = 0): Promise<void> => {
     const res = await evalSpecModel(specModel);
+    // Retry transient failures (TS worker still warming up on first load).
+    if (res.transient && !res.spec && attempt < 12) {
+      setTimeout(() => void evalSpec(attempt + 1), 150);
+      return;
+    }
     setSpecError(res.error);
     setSpec(res.spec);
     if (res.spec) {
@@ -174,7 +201,11 @@ export function App() {
         </div>
       </header>
 
-      <main class="grid">
+      <main
+        class="grid"
+        ref={gridEl}
+        style={{ "grid-template-columns": `${colFr()}fr 6px ${1 - colFr()}fr` }}
+      >
         <section class="pane">
           <div class="pane-title">Extension type <span class="muted">spec.ts</span></div>
           <Editor model={specModel} />
@@ -209,7 +240,7 @@ export function App() {
           </div>
         </section>
 
-        <section class="pane run">
+        <section class="pane">
           <div class="pane-title">Run <span class="muted">ctx.json</span></div>
           <Editor model={ctxModel} />
           <div class="runbar">
@@ -219,10 +250,20 @@ export function App() {
             <button disabled={busy()} onClick={() => void onRun()}>Run slot</button>
             <button disabled={busy()} onClick={() => void onTest()}>Run $tests</button>
           </div>
+        </section>
+
+        <section class="pane">
+          <div class="pane-title">Output</div>
           <div class="output">
             <OutputView output={output()} />
           </div>
         </section>
+
+        <div
+          class="gutter-v"
+          classList={{ active: dragging() }}
+          onPointerDown={onGutterDown}
+        />
       </main>
     </div>
   );

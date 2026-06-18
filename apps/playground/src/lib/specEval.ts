@@ -5,6 +5,8 @@ import { monaco } from "../monaco/setup";
 export interface SpecEvalResult {
   spec?: ExtensionTypeSpec;
   error?: string;
+  /** True when the failure is likely transient (TS worker not ready yet). */
+  transient?: boolean;
 }
 
 /** A fake `require` for the spec sandbox — only the runtime is importable. */
@@ -39,9 +41,13 @@ export async function evalSpecModel(
     const client = await getWorker(model.uri);
     const output = await client.getEmitOutput(model.uri.toString());
     js = output.outputFiles[0]?.text ?? "";
-    if (!js.trim()) return { error: "Spec produced no output (is it empty?)." };
+    // Empty output on a non-empty model usually means the worker isn't ready.
+    if (!js.trim()) return { error: "Evaluating spec…", transient: true };
   } catch (err) {
-    return { error: `Failed to transpile spec: ${(err as Error).message}` };
+    return {
+      error: `Failed to transpile spec: ${(err as Error)?.message ?? String(err)}`,
+      transient: true,
+    };
   }
 
   try {

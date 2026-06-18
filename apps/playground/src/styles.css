@@ -80,11 +80,12 @@ button:disabled {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* grid-template-columns is set inline from a signal so the vertical divider
+     between the two columns is draggable. Rows stay equal halves. */
   grid-template-rows: 1fr 1fr;
   grid-template-areas:
-    "spec run"
-    "ext run";
+    "spec gut ctx"
+    "ext gut out";
   gap: 1px;
   background: var(--border);
 }
@@ -97,14 +98,20 @@ button:disabled {
   background: var(--bg);
 }
 
-.pane:nth-child(1) {
-  grid-area: spec;
+.pane:nth-child(1) { grid-area: spec; }
+.pane:nth-child(2) { grid-area: ext; }
+.pane:nth-child(3) { grid-area: ctx; }
+.pane:nth-child(4) { grid-area: out; }
+
+.gutter-v {
+  grid-area: gut;
+  cursor: col-resize;
+  background: var(--border);
+  transition: background 0.1s;
 }
-.pane:nth-child(2) {
-  grid-area: ext;
-}
-.pane.run {
-  grid-area: run;
+.gutter-v:hover,
+.gutter-v.active {
+  background: var(--accent);
 }
 
 .pane-title {
