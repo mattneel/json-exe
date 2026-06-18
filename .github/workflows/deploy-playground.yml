@@ -2,7 +2,7 @@ name: Deploy playground
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   workflow_dispatch:
 
 # Allow the workflow to publish to GitHub Pages.
