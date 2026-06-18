@@ -5,9 +5,9 @@
   "description": "Monaco-based playground for authoring JSON.exe extension types and extensions with language-server ergonomics.",
   "type": "module",
   "scripts": {
-    "predev": "pnpm --filter \"@json-exe/editor...\" build",
+    "predev": "pnpm --filter \"@json-exe/playground^...\" build",
     "dev": "vite",
-    "prebuild": "pnpm --filter \"@json-exe/editor...\" build",
+    "prebuild": "pnpm --filter \"@json-exe/playground^...\" build",
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@json-exe/editor": "workspace:*",
+    "@json-exe/evaluator-quickjs": "workspace:*",
     "@json-exe/runtime": "workspace:*",
     "@json-exe/testing": "workspace:*",
     "monaco-editor": "^0.55.1",

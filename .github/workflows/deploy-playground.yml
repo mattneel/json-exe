@@ -36,7 +36,7 @@ jobs:
       # The playground bundles the runtime's .d.ts and imports the built
       # packages, so build its workspace deps first.
       - name: Build workspace deps
-        run: pnpm --filter "@json-exe/editor..." build
+        run: pnpm --filter "@json-exe/playground^..." build
 
       - name: Build playground
         run: pnpm --filter @json-exe/playground build

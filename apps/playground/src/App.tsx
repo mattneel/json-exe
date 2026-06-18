@@ -1,12 +1,14 @@
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import {
   validateExtension,
+  type Evaluator,
   type ExtensionTypeSpec,
   type JsonExeErrorObject,
   type SlotResult,
 } from "@json-exe/runtime";
 import type { TestReport } from "@json-exe/testing";
 import { evalSpecModel, installJsonExeLanguage } from "@json-exe/editor";
+import { createQuickJSEvaluator } from "@json-exe/evaluator-quickjs";
 import { monaco } from "./monaco/setup";
 import { Editor } from "./components/Editor";
 import { parseJson, runSlot, runTests, toErrorObject } from "./lib/run";
@@ -49,6 +51,19 @@ export function App() {
   const [slot, setSlot] = createSignal(sample0.defaultSlot);
   const [output, setOutput] = createSignal<Output>({ kind: "idle" });
   const [busy, setBusy] = createSignal(false);
+
+  // Selectable browser executor: the dev "unsafe" new Function, or sandboxed QuickJS.
+  const [executor, setExecutor] = createSignal<"unsafe" | "quickjs">("unsafe");
+  let quickjs: Evaluator | undefined;
+  let quickjsLoading: Promise<Evaluator> | undefined;
+  async function currentEvaluator(): Promise<Evaluator | undefined> {
+    if (executor() === "unsafe") return undefined;
+    if (quickjs) return quickjs;
+    if (!quickjsLoading) {
+      quickjsLoading = createQuickJSEvaluator().then((e) => (quickjs = e));
+    }
+    return quickjsLoading;
+  }
 
   // Draggable vertical divider between the two columns.
   const [colFr, setColFr] = createSignal(0.5);
@@ -157,7 +172,8 @@ export function App() {
     }
     setBusy(true);
     try {
-      const result = await runSlot(current, ext.value, slot(), ctx.value);
+      const evaluator = await currentEvaluator();
+      const result = await runSlot(current, ext.value, slot(), ctx.value, evaluator);
       setOutput({ kind: "run", result });
     } catch (err) {
       setOutput({ kind: "error", error: toErrorObject(err) });
@@ -179,7 +195,8 @@ export function App() {
     }
     setBusy(true);
     try {
-      setOutput({ kind: "test", report: await runTests(current, ext.value) });
+      const evaluator = await currentEvaluator();
+      setOutput({ kind: "test", report: await runTests(current, ext.value, evaluator) });
     } catch (err) {
       setOutput({ kind: "error", error: toErrorObject(err) });
     } finally {
@@ -194,6 +211,15 @@ export function App() {
           <strong>JSON.exe</strong> <span class="muted">playground</span>
         </div>
         <div class="controls">
+          <label class="muted" for="executor">executor</label>
+          <select
+            id="executor"
+            value={executor()}
+            onChange={(e) => setExecutor(e.currentTarget.value as "unsafe" | "quickjs")}
+          >
+            <option value="unsafe">new Function (unsafe)</option>
+            <option value="quickjs">QuickJS (sandboxed)</option>
+          </select>
           <label class="muted" for="sample">sample</label>
           <select id="sample" onChange={(e) => loadSample(e.currentTarget.value)}>
             <For each={SAMPLES}>

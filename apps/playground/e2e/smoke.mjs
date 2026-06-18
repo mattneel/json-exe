@@ -146,6 +146,30 @@ assert(
   `return-type awareness flags string-for-boolean: ${JSON.stringify(bridge).slice(0, 220)}`,
 );
 
+// 6. The QuickJS executor: select it, run a slot in the WASM sandbox.
+await page.evaluate(() => {
+  const m = globalThis.jsonexeMonaco;
+  const ext = m.editor.getModels().find((x) => x.uri.toString().includes("extension.json"));
+  ext.setValue(
+    JSON.stringify(
+      { $kind: "form-validator/v1", id: "x", validate: "return ctx.value.includes('@')" },
+      null,
+      2,
+    ),
+  );
+});
+await page.selectOption("#executor", "quickjs");
+await page.selectOption(".runbar select", "validate");
+await page.getByRole("button", { name: "Run slot" }).click();
+await page
+  .waitForFunction(() => /durationMs/.test(document.querySelector(".output")?.textContent || ""), null, { timeout: 20000 })
+  .catch(() => {});
+const qjsOut = (await page.locator(".output").textContent()) || "";
+assert(
+  qjsOut.includes("ok") && qjsOut.includes("true") && qjsOut.includes("durationMs"),
+  `QuickJS executor runs a slot in-browser: "${qjsOut.replace(/\s+/g, " ").slice(0, 90)}"`,
+);
+
 await browser.close();
 
 if (pageErrors.length) {

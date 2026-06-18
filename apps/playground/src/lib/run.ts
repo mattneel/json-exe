@@ -1,6 +1,7 @@
 import {
   compileExtension,
   JsonExeError,
+  type Evaluator,
   type ExtensionTypeSpec,
   type JsonExeErrorObject,
   type SlotResult,
@@ -36,8 +37,13 @@ export async function runSlot(
   extension: unknown,
   slot: string,
   ctx: unknown,
+  evaluator?: Evaluator,
 ): Promise<SlotResult> {
-  const compiled = await compileExtension(spec, extension);
+  const compiled = await compileExtension(
+    spec,
+    extension,
+    evaluator ? { evaluator } : {},
+  );
   return compiled.exec(slot, ctx, { trace: true });
 }
 
@@ -45,6 +51,7 @@ export async function runSlot(
 export async function runTests(
   spec: ExtensionTypeSpec,
   extension: unknown,
+  evaluator?: Evaluator,
 ): Promise<TestReport> {
-  return testExtension(spec, extension);
+  return testExtension(spec, extension, evaluator ? { evaluator } : {});
 }

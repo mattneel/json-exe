@@ -42,6 +42,8 @@ Packages:
 | `@json-exe/runtime`   | Core: define types, compile, run, validate, trace          |
 | `@json-exe/testing`   | Run the `$tests` embedded in an extension                  |
 | `jsonexe`             | CLI: `validate`, `run`, `test`, `check`, `explain`         |
+| `@json-exe/editor`    | Embeddable Monaco language features + editor component       |
+| `@json-exe/evaluator-quickjs` | Sandboxed evaluator (QuickJS-ng WASM)               |
 | `@json-exe/playground`| Monaco + Solid playground with embedded-TS slot ergonomics |
 
 ---
@@ -274,8 +276,20 @@ test** use only. The runtime still gives you:
 
 The security model is **capability-based**: a slot can only do what `ctx` lets
 it. Put narrow, scoped capabilities in `ctx` — not `db`, `fs`, `fetch`, or
-`process`. For untrusted code, run an isolated evaluator (worker / subprocess /
-QuickJS). See [docs/security.md](docs/security.md).
+`process`. See [docs/security.md](docs/security.md).
+
+For untrusted code, run the **sandboxed** [`@json-exe/evaluator-quickjs`](packages/evaluator-quickjs)
+(QuickJS-ng compiled to WASM): no host globals, a memory limit, and a CPU
+deadline that interrupts infinite loops.
+
+```ts
+import { createQuickJSEvaluator } from "@json-exe/evaluator-quickjs";
+const evaluator = await createQuickJSEvaluator();
+const ext = await compileExtension(spec, json, { evaluator });
+```
+
+The playground has an **executor dropdown** to switch between `new Function`
+(dev) and the QuickJS sandbox live in the browser.
 
 ---
 

@@ -1,0 +1,15 @@
+import { defineConfig } from "tsup";
+
+export default defineConfig({
+  entry: ["src/index.ts"],
+  format: ["esm"],
+  dts: true,
+  sourcemap: true,
+  clean: true,
+  target: "es2022",
+  external: [
+    "@json-exe/runtime",
+    "quickjs-emscripten-core",
+    "@jitl/quickjs-ng-wasmfile-release-sync",
+  ],
+});
