@@ -14,7 +14,7 @@ export { Trace } from "./trace";
 export { newFunctionEvaluator, resolveEvaluator, mapErrorLocation } from "./evaluator";
 export { checkPermissions } from "./permissions";
 export { getSlotSource } from "./slots";
-export { deepFreeze, errorMessage } from "./util";
+export { deepFreeze, errorMessage, uuid } from "./util";
 
 export {
   validateAgainstSchema,

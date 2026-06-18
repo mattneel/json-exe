@@ -6,7 +6,6 @@
  * carrying both the public {@link SlotResult} and (on failure) the original
  * {@link JsonExeError} instance so callers can choose to throw or not.
  */
-import { randomUUID } from "node:crypto";
 import type {
   CompiledFn,
   Schema,
@@ -22,7 +21,7 @@ import {
   toJsonExeError,
 } from "./errors";
 import { validateAgainstSchema } from "./schema";
-import { deepFreeze } from "./util";
+import { deepFreeze, uuid } from "./util";
 
 export interface InternalResult {
   public: SlotResult;
@@ -69,7 +68,7 @@ function withTimeout<T>(
 export async function executeSlot(p: ExecuteParams): Promise<InternalResult> {
   const startedAt = new Date().toISOString();
   const start = performance.now();
-  const traceId = randomUUID();
+  const traceId = uuid();
 
   const record: TraceRecord = {
     slot: p.slot,
