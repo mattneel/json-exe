@@ -51,16 +51,16 @@ export function App() {
   // Language-server ergonomics for the extension JSON, driven by the live spec.
   const language = installJsonExeLanguage(extModel, () => spec());
 
-  const refreshSpec = debounce(() => {
-    void evalSpecModel(specModel).then((res) => {
-      setSpecError(res.error);
-      setSpec(res.spec);
-      if (res.spec) {
-        const names = Object.keys(res.spec.slots);
-        if (!names.includes(slot()) && names[0]) setSlot(names[0]);
-      }
-    });
-  }, 250);
+  const evalSpec = async () => {
+    const res = await evalSpecModel(specModel);
+    setSpecError(res.error);
+    setSpec(res.spec);
+    if (res.spec) {
+      const names = Object.keys(res.spec.slots);
+      if (!names.includes(slot()) && names[0]) setSlot(names[0]);
+    }
+  };
+  const refreshSpec = debounce(() => void evalSpec(), 250);
 
   const refreshProblems = debounce(() => {
     const current = spec();
@@ -82,14 +82,18 @@ export function App() {
     specSub.dispose();
     extSub.dispose();
     language.dispose();
+    specModel.dispose();
+    extModel.dispose();
+    ctxModel.dispose();
   });
 
   // Initial + reactive recompute of problems/markers when the spec changes.
   createEffect(() => {
     spec();
     refreshProblems();
+    language.refresh();
   });
-  refreshSpec();
+  void evalSpec();
 
   const slotNames = () => (spec() ? Object.keys(spec()!.slots) : []);
 
@@ -181,18 +185,23 @@ export function App() {
           <Editor model={extModel} />
           <div class="problems">
             <Show
-              when={problems().length > 0}
-              fallback={<span class="ok">✓ valid {spec()?.kind ?? ""}</span>}
+              when={spec()}
+              fallback={<span class="muted">{specError() ?? "evaluating spec…"}</span>}
             >
-              <For each={problems()}>
-                {(p) => (
-                  <div class="problem">
-                    <span class="kind">{p.kind}</span>
-                    {p.slot || p.field ? <span class="where">[{p.slot ?? p.field}]</span> : null}
-                    <span>{p.message}</span>
-                  </div>
-                )}
-              </For>
+              <Show
+                when={problems().length > 0}
+                fallback={<span class="ok">✓ valid {spec()!.kind}</span>}
+              >
+                <For each={problems()}>
+                  {(p) => (
+                    <div class="problem">
+                      <span class="kind">{p.kind}</span>
+                      {p.slot || p.field ? <span class="where">[{p.slot ?? p.field}]</span> : null}
+                      <span>{p.message}</span>
+                    </div>
+                  )}
+                </For>
+              </Show>
             </Show>
           </div>
         </section>

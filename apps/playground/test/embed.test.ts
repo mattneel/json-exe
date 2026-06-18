@@ -7,6 +7,7 @@ import {
   decodedToRawOffset,
   findValueRange,
   rawToDecodedOffset,
+  specToJsonSchema,
   synthesizeCtxDecls,
 } from "../src/lib/embed";
 
@@ -46,6 +47,12 @@ describe("buildEscapeMap", () => {
     expect(decodedToRawOffset(map, 7)).toBe(7);
     expect(rawToDecodedOffset(map, 7)).toBe(7);
   });
+
+  it("does not overshoot on a truncated \\u escape", () => {
+    const map = buildEscapeMap("\\u12"); // invalid: only 2 hex digits
+    expect(map.decoded).toBe("u12");
+    expect(map.decodedToRaw).toEqual([0, 2, 3, 4]);
+  });
 });
 
 describe("synthesizeCtxDecls", () => {
@@ -72,6 +79,42 @@ describe("synthesizeCtxDecls", () => {
   it("falls back to an index signature when no context is declared", () => {
     const bare = defineExtensionType({ kind: "y/v1", slots: {} });
     expect(synthesizeCtxDecls(bare)).toContain("[key: string]: unknown;");
+  });
+
+  it("aliases lowercase custom type names too (not just capitalized)", () => {
+    const s = defineExtensionType({
+      kind: "z/v1",
+      context: { widget: "myWidget", count: "number" },
+      slots: {},
+    });
+    const decls = synthesizeCtxDecls(s);
+    expect(decls).toContain("type myWidget = any;");
+    expect(decls).not.toContain("type number = any;");
+  });
+});
+
+describe("specToJsonSchema", () => {
+  const spec = defineExtensionType({
+    kind: "form-validator/v1",
+    staticFields: { id: { required: true, schema: { type: "string" } } },
+    slots: {
+      validate: { required: true, returns: { type: "boolean" }, description: "is it valid" },
+      message: { returns: { type: "string" } },
+    },
+  });
+
+  it("produces a lenient schema with slot keys, $kind default, and static fields", () => {
+    const schema = specToJsonSchema(spec) as {
+      type: string;
+      additionalProperties: boolean;
+      properties: Record<string, { default?: string }>;
+    };
+    expect(schema.type).toBe("object");
+    expect(schema.additionalProperties).toBe(true);
+    expect(schema.properties.$kind?.default).toBe("form-validator/v1");
+    expect(schema.properties.validate).toBeDefined();
+    expect(schema.properties.message).toBeDefined();
+    expect(schema.properties.id).toBeDefined();
   });
 });
 

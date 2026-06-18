@@ -71,6 +71,14 @@ const BUILTIN_TYPES = new Set([
   "Iterable", "AsyncIterable", "Exclude", "Extract", "NonNullable",
 ]);
 
+// Primitives, keywords, and type operators that must NOT be aliased to `any`.
+const TS_PRIMITIVES = new Set([
+  "string", "number", "boolean", "unknown", "any", "void", "null",
+  "undefined", "never", "object", "symbol", "bigint", "this", "true",
+  "false", "readonly", "keyof", "typeof", "infer", "extends", "in", "is",
+  "asserts", "as", "new", "const",
+]);
+
 /**
  * Synthesize ambient TypeScript declaring `ctx` from a spec's context map.
  * Capitalized identifiers in the type strings that aren't built-ins are aliased
@@ -80,9 +88,13 @@ export function synthesizeCtxDecls(spec: ExtensionTypeSpec): string {
   const entries = Object.entries(spec.context ?? {});
   const unknownTypes = new Set<string>();
   for (const [, typeText] of entries) {
-    for (const m of typeText.matchAll(/\b([A-Z][A-Za-z0-9_]*)\b/g)) {
+    // Alias any identifier (regardless of case) that isn't a built-in type or a
+    // TS primitive/keyword, so custom host type names don't error. Aliasing the
+    // occasional property name is harmless (an unused `type` declaration).
+    for (const m of typeText.matchAll(/\b([A-Za-z_$][\w$]*)\b/g)) {
       const id = m[1]!;
-      if (!BUILTIN_TYPES.has(id)) unknownTypes.add(id);
+      if (BUILTIN_TYPES.has(id) || TS_PRIMITIVES.has(id)) continue;
+      unknownTypes.add(id);
     }
   }
   const aliases = [...unknownTypes].map((t) => `type ${t} = any;`).join("\n");
@@ -90,6 +102,40 @@ export function synthesizeCtxDecls(spec: ExtensionTypeSpec): string {
     ? entries.map(([k, t]) => `  ${JSON.stringify(k)}: ${t};`).join("\n")
     : "  [key: string]: unknown;";
   return `${aliases}${aliases ? "\n" : ""}declare const ctx: {\n${fields}\n};\n`;
+}
+
+/**
+ * Build a lenient JSON Schema from a spec to power *key* completions in the
+ * extension editor (slot names, $kind, static fields). Intentionally carries no
+ * validation constraints (only descriptions + a $kind default) so it never
+ * duplicates the runtime's structural diagnostics or suppresses JSON syntax
+ * errors.
+ */
+export function specToJsonSchema(spec: ExtensionTypeSpec): Record<string, unknown> {
+  const properties: Record<string, unknown> = {
+    $schema: { type: "string", description: "Schema URL." },
+    $kind: { description: `Extension kind. Expected: ${spec.kind}`, default: spec.kind },
+    $id: { type: "string" },
+    $version: { type: "string" },
+    $permissions: { type: "object", description: "Declared permission manifest." },
+    $tests: { type: "array", description: "Embedded test cases." },
+    id: { type: "string" },
+    name: { type: "string" },
+    description: { type: "string" },
+  };
+  for (const [name, slotSpec] of Object.entries(spec.slots)) {
+    properties[name] = {
+      description: slotSpec.description
+        ? `slot — ${slotSpec.description}`
+        : `slot "${name}" (JavaScript source string)`,
+    };
+  }
+  for (const [field, fieldSpec] of Object.entries(spec.staticFields ?? {})) {
+    properties[field] = {
+      description: fieldSpec.description ?? `static field "${field}"`,
+    };
+  }
+  return { type: "object", properties, additionalProperties: true };
 }
 
 export interface SlotModule {
@@ -135,8 +181,13 @@ export function buildEscapeMap(raw: string): EscapeMap {
         case "/": val = "/"; break;
         case "u": {
           const hex = raw.slice(i + 2, i + 6);
-          val = String.fromCharCode(Number.parseInt(hex, 16) || 0);
-          len = 6;
+          if (/^[0-9a-fA-F]{4}$/.test(hex)) {
+            val = String.fromCharCode(Number.parseInt(hex, 16));
+            len = 6;
+          } else {
+            val = "u"; // malformed \u escape — treat as a literal 'u'
+            len = 2;
+          }
           break;
         }
         default: val = n; break;

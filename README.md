@@ -37,11 +37,12 @@ pnpm examples     # run the runnable examples (after build)
 
 Packages:
 
-| Package             | What it is                                                  |
-| ------------------- | ---------------------------------------------------------- |
-| `@json-exe/runtime` | Core: define types, compile, run, validate, trace          |
-| `@json-exe/testing` | Run the `$tests` embedded in an extension                  |
-| `jsonexe`           | CLI: `validate`, `run`, `test`, `check`, `explain`         |
+| Package               | What it is                                                  |
+| --------------------- | ---------------------------------------------------------- |
+| `@json-exe/runtime`   | Core: define types, compile, run, validate, trace          |
+| `@json-exe/testing`   | Run the `$tests` embedded in an extension                  |
+| `jsonexe`             | CLI: `validate`, `run`, `test`, `check`, `explain`         |
+| `@json-exe/playground`| Monaco + Solid playground with embedded-TS slot ergonomics |
 
 ---
 
@@ -222,6 +223,20 @@ jsonexe run required-email.json validate --ctx ctx.json --spec form-validator.sp
 ```
 
 ---
+
+## Playground
+
+A browser playground (`apps/playground`, SolidJS + Vite + Monaco) lets you author
+a spec (TypeScript, with IntelliSense on `@json-exe/runtime`) and an extension
+(JSON, with a **TypeScript service embedded inside the slot strings** — `ctx.*`
+completions/hover/type-errors driven by the live spec), then run/test/trace it
+in-browser using the real runtime.
+
+```bash
+pnpm --filter @json-exe/playground dev
+```
+
+See [`apps/playground/README.md`](apps/playground/README.md).
 
 ## Security
 

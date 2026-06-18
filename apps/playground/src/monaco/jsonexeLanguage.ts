@@ -11,11 +11,13 @@ import {
   decodedToRawOffset,
   findValueRange,
   rawToDecodedOffset,
+  specToJsonSchema,
   synthesizeCtxDecls,
   type EscapeMap,
 } from "../lib/embed";
 
 const OWNER = "jsonexe";
+const SCHEMA_URI = "inmemory://playground/extension.schema.json";
 
 type GetSpec = () => ExtensionTypeSpec | undefined;
 
@@ -86,6 +88,7 @@ export function installJsonExeLanguage(
   getSpec: GetSpec,
 ): JsonExeLanguage {
   const hidden = new Map<string, monaco.editor.ITextModel>();
+  let runGeneration = 0;
 
   function ensureHidden(slot: string): monaco.editor.ITextModel {
     let m = hidden.get(slot);
@@ -118,7 +121,9 @@ export function installJsonExeLanguage(
 
     const raw = text.slice(hit.start, hit.end);
     const map = buildEscapeMap(raw);
-    const mod = buildSlotModule(synthesizeCtxDecls(spec), map.decoded);
+    // CR -> LF keeps the hidden-model offsets aligned with our map (Monaco
+    // normalizes EOL); \r and \n are equivalent for TS analysis.
+    const mod = buildSlotModule(synthesizeCtxDecls(spec), map.decoded.replace(/\r/g, "\n"));
     const model = ensureHidden(hit.slot);
     if (model.getValue() !== mod.content) model.setValue(mod.content);
 
@@ -229,6 +234,10 @@ export function installJsonExeLanguage(
   }
 
   async function runDiagnostics(): Promise<void> {
+    const gen = ++runGeneration;
+    const version = extModel.getVersionId();
+    const stale = () => gen !== runGeneration || extModel.getVersionId() !== version;
+
     const spec = getSpec();
     if (!spec) {
       monaco.editor.setModelMarkers(extModel, OWNER, []);
@@ -237,6 +246,19 @@ export function installJsonExeLanguage(
     }
     const text = extModel.getValue();
     const markers: monaco.editor.IMarkerData[] = [];
+
+    // Drive JSON key / $kind completions from the live spec (lenient schema, so
+    // it adds no validation noise on top of our structural diagnostics).
+    monaco.json.jsonDefaults.setDiagnosticsOptions({
+      validate: true,
+      schemas: [
+        {
+          uri: SCHEMA_URI,
+          fileMatch: [extModel.uri.toString()],
+          schema: specToJsonSchema(spec),
+        },
+      ],
+    });
 
     let parsed: unknown;
     let parseOk = true;
@@ -259,7 +281,7 @@ export function installJsonExeLanguage(
     for (const r of ranges) {
       const raw = text.slice(r.start, r.end);
       const map = buildEscapeMap(raw);
-      const mod = buildSlotModule(decls, map.decoded);
+      const mod = buildSlotModule(decls, map.decoded.replace(/\r/g, "\n"));
       const model = ensureHidden(r.slot);
       if (model.getValue() !== mod.content) model.setValue(mod.content);
       const client = await tsWorker(model.uri);
@@ -268,6 +290,7 @@ export function installJsonExeLanguage(
         ...(await client.getSyntacticDiagnostics(uri)),
         ...(await client.getSemanticDiagnostics(uri)),
       ];
+      if (stale()) return; // model changed under us — drop this run
       for (const d of diags) {
         if (d.start == null || d.length == null) continue;
         const decodedStart = d.start - mod.bodyOffset;
@@ -287,6 +310,7 @@ export function installJsonExeLanguage(
       }
     }
 
+    if (stale()) return; // drop stale results rather than paint wrong offsets
     monaco.editor.setModelMarkers(extModel, OWNER, markers);
   }
 

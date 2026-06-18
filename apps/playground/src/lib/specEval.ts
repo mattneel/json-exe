@@ -1,4 +1,5 @@
-import { defineExtensionType, type ExtensionTypeSpec } from "@json-exe/runtime";
+import * as runtime from "@json-exe/runtime";
+import type { ExtensionTypeSpec } from "@json-exe/runtime";
 import { monaco } from "../monaco/setup";
 
 export interface SpecEvalResult {
@@ -6,20 +7,29 @@ export interface SpecEvalResult {
   error?: string;
 }
 
-/**
- * Turn the emitted JS of the spec module into something we can evaluate:
- * strip imports/exports and turn `export default X` into `return X`. The only
- * free identifier the spec body may reference is `defineExtensionType`, which we
- * pass in.
- */
-function toEvaluable(js: string): string {
-  return js
-    .replace(/^\s*import\s[^\n]*$/gm, "")
-    .replace(/^\s*export\s+default\s+/m, "return ")
-    .replace(/^\s*export\s+\{[^}]*\};?\s*$/gm, "");
+/** A fake `require` for the spec sandbox — only the runtime is importable. */
+function specRequire(id: string): unknown {
+  if (id === "@json-exe/runtime") return runtime;
+  throw new Error(
+    `Cannot import "${id}" — only "@json-exe/runtime" is available in the playground.`,
+  );
 }
 
-/** Transpile + evaluate a spec TypeScript model into an ExtensionTypeSpec. */
+function isSpec(value: unknown): value is ExtensionTypeSpec {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as ExtensionTypeSpec).kind === "string" &&
+    typeof (value as ExtensionTypeSpec).slots === "object" &&
+    (value as ExtensionTypeSpec).slots !== null
+  );
+}
+
+/**
+ * Transpile the spec TypeScript model (CommonJS, via Monaco's worker) and
+ * execute it with a sandboxed `require`, returning the exported spec object.
+ * Robust to multi-line imports, named exports, comments, and `as const`.
+ */
 export async function evalSpecModel(
   model: monaco.editor.ITextModel,
 ): Promise<SpecEvalResult> {
@@ -29,34 +39,30 @@ export async function evalSpecModel(
     const client = await getWorker(model.uri);
     const output = await client.getEmitOutput(model.uri.toString());
     js = output.outputFiles[0]?.text ?? "";
-    if (!js) return { error: "Spec produced no output (is it empty?)." };
+    if (!js.trim()) return { error: "Spec produced no output (is it empty?)." };
   } catch (err) {
     return { error: `Failed to transpile spec: ${(err as Error).message}` };
   }
 
-  const body = toEvaluable(js);
-  if (!/\breturn\b/.test(body)) {
-    return {
-      error:
-        "Spec must `export default defineExtensionType({ ... })` (or export a spec object).",
-    };
-  }
-
   try {
+    const moduleObj: { exports: Record<string, unknown> } = { exports: {} };
     // eslint-disable-next-line no-new-func
-    const factory = new Function("defineExtensionType", body) as (
-      d: typeof defineExtensionType,
-    ) => unknown;
-    const spec = factory(defineExtensionType);
-    if (
-      !spec ||
-      typeof spec !== "object" ||
-      typeof (spec as ExtensionTypeSpec).kind !== "string" ||
-      typeof (spec as ExtensionTypeSpec).slots !== "object"
-    ) {
-      return { error: "Spec is not a valid extension type ({ kind, slots })." };
+    const factory = new Function("require", "exports", "module", js) as (
+      require: (id: string) => unknown,
+      exports: unknown,
+      module: { exports: Record<string, unknown> },
+    ) => void;
+    factory(specRequire, moduleObj.exports, moduleObj);
+
+    const exported = moduleObj.exports;
+    const candidate = exported.default ?? exported.spec ?? exported;
+    if (!isSpec(candidate)) {
+      return {
+        error:
+          "Spec must `export default defineExtensionType({ kind, slots })` (or export a `spec`).",
+      };
     }
-    return { spec: spec as ExtensionTypeSpec };
+    return { spec: candidate };
   } catch (err) {
     return { error: `Failed to evaluate spec: ${(err as Error).message}` };
   }

@@ -30,7 +30,9 @@ const ts = monaco.typescript;
 
 ts.typescriptDefaults.setCompilerOptions({
   target: ts.ScriptTarget.ES2020,
-  module: ts.ModuleKind.ESNext,
+  // CommonJS emit lets us execute the spec module with a fake `require`
+  // (see specEval.ts) — robust against multi-line imports, named exports, etc.
+  module: ts.ModuleKind.CommonJS,
   moduleResolution: ts.ModuleResolutionKind.NodeJs,
   allowNonTsExtensions: true,
   strict: true,
